@@ -136,7 +136,7 @@ func (w *Worker) run(ctx context.Context, job *store.Job) error {
 	w.stage(job, store.StatusTranscribing, "transcribing with "+model)
 
 	// Step 3: transcribe the whole recording.
-	res, err := w.asr.Transcribe(ctx, wav, model)
+	res, err := w.asr.Transcribe(ctx, wav, model, job.Diarize)
 	if err != nil {
 		return err
 	}

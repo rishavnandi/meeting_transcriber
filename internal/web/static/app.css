@@ -110,6 +110,9 @@ button:hover, .btn:hover { border-color: var(--accent); color: var(--accent); }
 /* summary model picker ---------------------------------------------------- */
 .model-picker { flex-basis: 100%; }
 .model-field { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--muted); }
+.toggle { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); cursor: pointer; }
+.toggle input { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
+.toggle:hover { color: var(--fg); }
 .model-field select {
   font: inherit;
   font-size: 14px;

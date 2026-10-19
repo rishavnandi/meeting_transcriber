@@ -32,6 +32,9 @@ type Word struct {
 	Word  string  `json:"word"`
 	Start float64 `json:"start"`
 	End   float64 `json:"end"`
+	// Speaker is the number of the person speaking, when the recording was
+	// diarised. It is zero when it was not.
+	Speaker int `json:"speaker,omitempty"`
 }
 
 // Result is the recogniser output for one file.
@@ -107,8 +110,15 @@ func (a *ASR) Duration(ctx context.Context, path string) (float64, error) {
 }
 
 // Transcribe runs the recogniser over a WAV file and returns its output.
-func (a *ASR) Transcribe(ctx context.Context, wavPath, model string) (*Result, error) {
+//
+// When diarize is set, the recogniser also works out who spoke when and tags
+// every word with a speaker number. It does not know anyone's name, only that
+// they are the same voice.
+func (a *ASR) Transcribe(ctx context.Context, wavPath, model string, diarize bool) (*Result, error) {
 	args := []string{"transcribe", wavPath, "--model", model, "--format", "json", "--quiet"}
+	if diarize {
+		args = append(args, "--diarize")
+	}
 	cmd := exec.CommandContext(ctx, a.cfg.Binary, args...)
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
@@ -182,7 +192,7 @@ func (a *ASR) DetectLanguages(ctx context.Context, wavPath string, duration floa
 			a.log.Warn("language sample failed", "window", i, "err", err)
 			continue
 		}
-		res, err := a.Transcribe(ctx, clip, a.cfg.ModelMultilingual)
+		res, err := a.Transcribe(ctx, clip, a.cfg.ModelMultilingual, false)
 		if err != nil {
 			a.log.Warn("language sample failed", "window", i, "err", err)
 			continue

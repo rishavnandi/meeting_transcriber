@@ -8,9 +8,13 @@ import (
 // TranscriptText renders the recognised words as readable timestamped text.
 //
 // The recogniser gives word level timings but no paragraphs, so the text is
-// grouped here. A new line starts when there is a pause, or when the line
-// grows past a comfortable length, and each line is prefixed with the time it
-// starts at.
+// grouped here. A new line starts when the speaker changes, when there is a
+// pause, or when the line grows past a comfortable length, and each line is
+// prefixed with the time it starts at.
+//
+// When the recording was diarised, the line also names the speaker. The
+// recogniser only knows that two voices are different, not what anyone is
+// called, so the name is a number.
 //
 // The result is what the summariser reads, so the timestamps help it refer to
 // moments in the meeting.
@@ -19,12 +23,18 @@ func (r *Result) TranscriptText() string {
 	var line []string
 	lineStart := 0.0
 	prevEnd := 0.0
+	speaker := 0
 
 	flush := func() {
 		if len(line) == 0 {
 			return
 		}
-		fmt.Fprintf(&b, "[%s] %s\n", clock(lineStart), strings.Join(line, " "))
+		text := strings.Join(line, " ")
+		if speaker > 0 {
+			fmt.Fprintf(&b, "[%s] Speaker %d: %s\n", clock(lineStart), speaker, text)
+		} else {
+			fmt.Fprintf(&b, "[%s] %s\n", clock(lineStart), text)
+		}
 		line = line[:0]
 	}
 
@@ -34,13 +44,16 @@ func (r *Result) TranscriptText() string {
 		}
 		if len(line) == 0 {
 			lineStart = w.Start
+			speaker = w.Speaker
 		} else {
-			// A pause of more than a second and a half means a new thought
-			// started. The recogniser puts small gaps between words, so the
+			// A change of speaker starts a new line, as does a pause of more
+			// than a second and a half, or a line that has grown too long.
+			// The recogniser puts small gaps between words, so the pause
 			// threshold is generous on purpose.
-			if w.Start-prevEnd > 1.5 || lineLen(line) > 110 {
+			if w.Speaker != speaker || w.Start-prevEnd > 1.5 || lineLen(line) > 110 {
 				flush()
 				lineStart = w.Start
+				speaker = w.Speaker
 			}
 		}
 		line = append(line, w.Word)
