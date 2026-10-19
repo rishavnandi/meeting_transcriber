@@ -11,6 +11,9 @@ set -e
 if [ "$1" = "pull-models" ]; then
   nemo-speech pull nemotron-3.5
   nemo-speech pull nemotron-en
+  # The diariser that works out who spoke when. Small, and the speaker labels
+  # on the upload form are on by default.
+  nemo-speech pull sortformer
   exit 0
 fi
 
