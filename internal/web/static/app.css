@@ -67,7 +67,7 @@ main { max-width: 860px; margin: 0 auto; padding: 0 20px 64px; }
 
 /* upload ------------------------------------------------------------------ */
 .upload { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.file { position: relative; overflow: hidden; display: inline-flex; }
+.file { position: relative; overflow: hidden; display: inline-flex; max-width: 100%; }
 .file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
 .file span {
   border: 1px solid var(--line);
@@ -76,8 +76,15 @@ main { max-width: 860px; margin: 0 auto; padding: 0 20px 64px; }
   color: var(--muted);
   background: var(--bg);
   font-size: 14px;
+  /* A long recording name must not push the button off the row. */
+  max-width: 340px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .file:hover span { border-color: var(--accent); color: var(--accent); }
+/* A chosen file reads as the normal text colour, not a muted placeholder. */
+.file span.picked { color: var(--fg); }
 
 button, .btn {
   font: inherit;

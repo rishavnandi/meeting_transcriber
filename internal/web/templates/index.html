@@ -17,7 +17,8 @@
           hx-swap="afterbegin"
           hx-indicator="#spinner">
       <label class="file">
-        <input type="file" name="file" accept="audio/*,.mp3,.wav,.m4a,.ogg,.webm,.flac" required>
+        <input type="file" name="file" accept="audio/*,.mp3,.wav,.m4a,.ogg,.webm,.flac" required
+               onchange="var s=this.nextElementSibling, f=this.files[0]; s.textContent = f ? f.name : 'Choose a recording'; s.classList.toggle('picked', !!f)">
         <span>Choose a recording</span>
       </label>
       <button type="submit" class="primary">Transcribe</button>
