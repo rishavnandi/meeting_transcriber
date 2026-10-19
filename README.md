@@ -120,6 +120,25 @@ Every setting is an environment variable, set in `docker-compose.yml`.
 | `FFPROBE_BIN` | `ffprobe` | path to ffprobe |
 | `OPENCODE_BIN` | `opencode` | path to opencode |
 
+## Speaker labels
+
+The upload form has a **Speaker labels** checkbox, on by default. With it on,
+the recogniser also works out who spoke when from the voice alone, and the
+transcript reads as a conversation:
+
+```
+[00:00] Speaker 1: Priya here the refund webhook is still failing for partial refunds. I looked at the logs this morning
+[00:06] Speaker 1: is returning a five hundred.
+[00:08] Speaker 2: Thanks Priya Rahul here. I will get the production keys from the payment team before Friday
+```
+
+The diariser is NVIDIA's Sortformer, which sorts out up to four speakers. It
+does not know anyone's name, only that two voices are different, so the label
+is a number. People usually name themselves in a meeting, and the summariser
+picks the names up from what they say.
+
+It costs one more model (147 MB) and one more pass over the audio.
+
 ## The summary
 
 `opencode run` is called with a free OpenCode Zen model, so there is no API key
