@@ -1,0 +1,36 @@
+{{define "transcript"}}<!doctype html>
+<html lang="en">
+{{template "head" .}}
+<body>
+<header class="topbar">
+  <a class="back" href="/">← All recordings</a>
+  <h1>{{.Job.Name}}</h1>
+  <p class="muted">
+    {{clock .Job.Duration}}
+    {{if .Job.Model}}· {{.Job.Model}}{{end}}
+    {{if .Job.Languages}}· {{range .Job.Languages}}{{.}} {{end}}{{end}}
+  </p>
+</header>
+
+<main>
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Summary</h2>
+      {{if .Job.Summary}}<a class="btn" href="/jobs/{{.Job.ID}}/summary.md">Download</a>{{end}}
+    </div>
+    {{if .Summary}}
+      <div class="summary">{{.Summary}}</div>
+    {{else}}
+      <p class="muted">No summary for this recording.</p>
+    {{end}}
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Transcript</h2>
+      <a class="btn" href="/jobs/{{.Job.ID}}/transcript.txt">Download</a>
+    </div>
+    <pre class="transcript">{{.Transcript}}</pre>
+  </section>
+</main>
+</body></html>{{end}}

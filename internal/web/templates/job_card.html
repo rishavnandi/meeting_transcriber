@@ -1,0 +1,36 @@
+{{define "job_card"}}
+<article class="job" id="job-{{.Job.ID}}"
+  {{if .Job.Status.Pending}}hx-get="/jobs/{{.Job.ID}}" hx-trigger="every 3s" hx-swap="outerHTML"{{end}}>
+  <div class="job-head">
+    <span class="job-name">{{.Job.Name}}</span>
+    <span class="badge {{.Job.Status}}">{{.Job.Status}}</span>
+  </div>
+
+  {{if and (not (eq .Job.Status "done")) (not (eq .Job.Status "failed"))}}
+    <p class="job-stage">{{.Job.Stage}}</p>
+  {{end}}
+
+  <p class="muted small">
+    {{if .Job.Duration}}{{clock .Job.Duration}}{{end}}
+    {{if .Job.SizeBytes}}· {{bytes .Job.SizeBytes}}{{end}}
+    {{if .Job.Model}}· {{.Job.Model}}{{end}}
+    {{if .Job.Languages}}· {{range .Job.Languages}}{{.}} {{end}}{{end}}
+  </p>
+
+  {{if .Job.Error}}<p class="error">{{.Job.Error}}</p>{{end}}
+  {{if .Job.SummaryError}}<p class="warn">The transcript is ready, but the summary failed: {{.Job.SummaryError}}</p>{{end}}
+
+  <div class="job-actions">
+    {{if eq .Job.Status "done"}}
+      <a class="btn" href="/jobs/{{.Job.ID}}/transcript">Open transcript</a>
+      <a class="btn" href="/jobs/{{.Job.ID}}/transcript.txt">Download text</a>
+      {{if .Job.Summary}}<a class="btn" href="/jobs/{{.Job.ID}}/summary.md">Download summary</a>{{end}}
+    {{end}}
+    <button class="btn danger"
+            hx-delete="/jobs/{{.Job.ID}}"
+            hx-target="#job-{{.Job.ID}}"
+            hx-swap="delete"
+            hx-confirm="Delete {{.Job.Name}} and its transcript?">Delete</button>
+  </div>
+</article>
+{{end}}

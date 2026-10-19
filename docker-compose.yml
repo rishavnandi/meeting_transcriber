@@ -1,0 +1,32 @@
+services:
+  # One shot: downloads the speech recognition models into the cache volume.
+  # The app waits for it, so the first start is the only slow one.
+  models:
+    image: meeting-transcriber:latest
+    build: .
+    command: ["pull-models"]
+    volumes:
+      - cache:/home/app
+    restart: "no"
+
+  app:
+    image: meeting-transcriber:latest
+    build: .
+    depends_on:
+      models:
+        condition: service_completed_successfully
+    # Bound to localhost only. tailscale serve is what puts it on the tailnet.
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - cache:/home/app
+      - data:/data
+    environment:
+      ADDR: ":8080"
+      DATA_DIR: "/data"
+      SUMMARY_MODEL: "opencode/big-pickle"
+    restart: unless-stopped
+
+volumes:
+  cache:
+  data:

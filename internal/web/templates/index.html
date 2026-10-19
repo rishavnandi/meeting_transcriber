@@ -1,0 +1,37 @@
+{{define "index"}}<!doctype html>
+<html lang="en">
+{{template "head" .}}
+<body>
+<header class="topbar">
+  <h1>Meeting transcriber</h1>
+  <p class="muted">Drop a recording, get a transcript and a summary. Runs on your own box.</p>
+</header>
+
+<main>
+  <section class="panel">
+    <h2>New recording</h2>
+    <form class="upload"
+          hx-post="/jobs"
+          hx-encoding="multipart/form-data"
+          hx-target="#jobs"
+          hx-swap="afterbegin"
+          hx-indicator="#spinner">
+      <label class="file">
+        <input type="file" name="file" accept="audio/*,.mp3,.wav,.m4a,.ogg,.webm,.flac" required>
+        <span>Choose a recording</span>
+      </label>
+      <button type="submit" class="primary">Transcribe</button>
+      <span id="spinner" class="spinner htmx-indicator">Uploading…</span>
+    </form>
+    <p class="muted small">MP3, WAV, M4A and anything else ffmpeg can read. One hour of audio takes about 40 minutes to transcribe on this box.</p>
+  </section>
+
+  <section class="panel">
+    <h2>Recordings</h2>
+    <div id="jobs">
+      {{range .Jobs}}{{template "job_card" (dict "Job" .)}}{{end}}
+    </div>
+    {{if not .Jobs}}<p class="muted">Nothing here yet.</p>{{end}}
+  </section>
+</main>
+</body></html>{{end}}

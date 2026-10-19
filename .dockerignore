@@ -1,0 +1,7 @@
+.git
+.gitignore
+README.md
+Makefile
+data
+*.log
+.DS_Store
