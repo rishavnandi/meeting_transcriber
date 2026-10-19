@@ -113,8 +113,8 @@ Every setting is an environment variable, set in `docker-compose.yml`.
 | `DATA_DIR` | `/data` | where recordings and transcripts are kept |
 | `MODEL_MULTILINGUAL` | `nemotron-3.5` | model for recordings containing Hindi |
 | `MODEL_ENGLISH` | `nemotron-en` | model for English only recordings |
-| `SUMMARY_MODEL` | `opencode/big-pickle` | model that writes the summary |
-| `SUMMARY_TIMEOUT` | `15m` | how long one summary may take |
+| `SUMMARY_MODEL` | `opencode/big-pickle` | model used when the picker is not there |
+| `SUMMARY_TIMEOUT` | `15m` | how long the whole summary may take |
 | `NEMO_BIN` | `nemo-speech` | path to the recogniser |
 | `FFMPEG_BIN` | `ffmpeg` | path to ffmpeg |
 | `FFPROBE_BIN` | `ffprobe` | path to ffprobe |
@@ -123,8 +123,10 @@ Every setting is an environment variable, set in `docker-compose.yml`.
 ## The summary
 
 `opencode run` is called with a free OpenCode Zen model, so there is no API key
-and no cost. `big-pickle` is used because it is a free model that stays
-available, unlike the other free models that come and go.
+and no cost. The list of free models is fetched live and offered as a picker on
+the upload form, because the free models come and go: a model has to be both
+available to the account and free to be offered. Whichever one is picked is
+recorded on the job and shown next to the recording.
 
 The prompt asks for four sections: a summary, the decisions that were made, a
 table of action items with owners and due dates, and the questions that were
@@ -134,6 +136,29 @@ transcript.
 
 A summary that fails does not fail the job. The transcript is the point, so it
 is kept and the error is shown next to it.
+
+### Long meetings
+
+The model reads the transcript with a tool that returns at most 2000 lines of a
+file, and it does not notice when there is more. Left alone, a meeting of two
+hours or more got a summary of only its first part, with nothing to show that
+anything was missing.
+
+So a long transcript is split into parts of at most 1500 lines, each part is
+summarised on its own, and the part summaries are merged into one. The part
+summaries are asked for in the same four sections, so the merge has something
+structured to work with. A meeting of an hour or so still needs only one call.
+
+There is a test for this, because the failure is silent and a unit test cannot
+catch it:
+
+```sh
+SUMMARIZE_TEST=1 go test ./internal/summarize/ -run Long
+```
+
+It writes a transcript with a detail on its very last line, summarises it
+through the real model, and fails if the summary does not mention that detail.
+It is skipped unless `SUMMARIZE_TEST` is set, because it needs a model.
 
 ## Layout
 
