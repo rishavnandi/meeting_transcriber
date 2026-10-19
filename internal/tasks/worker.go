@@ -147,7 +147,7 @@ func (w *Worker) run(ctx context.Context, job *store.Job) error {
 	// Step 4: summarise. A summary that fails does not fail the job: the
 	// transcript is the reason the recording was uploaded.
 	w.stage(job, store.StatusSummarizing, "writing the summary")
-	summary, err := w.sum.Summarize(ctx, w.st.TranscriptTextPath(job.ID))
+	summary, err := w.sum.Summarize(ctx, w.st.TranscriptTextPath(job.ID), job.SummaryModel)
 	if err != nil {
 		w.log.Error("summary failed", "id", job.ID, "err", err)
 		job.SummaryError = err.Error()

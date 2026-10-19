@@ -14,6 +14,7 @@
     {{if .Job.Duration}}{{clock .Job.Duration}}{{end}}
     {{if .Job.SizeBytes}}· {{bytes .Job.SizeBytes}}{{end}}
     {{if .Job.Model}}· {{.Job.Model}}{{end}}
+    {{if .Job.SummaryModel}}· summary by {{.Job.SummaryModel}}{{end}}
     {{if .Job.Languages}}· {{range .Job.Languages}}{{.}} {{end}}{{end}}
   </p>
 

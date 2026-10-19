@@ -72,7 +72,7 @@ func run(log *slog.Logger) error {
 
 	srv := &http.Server{
 		Addr:    env("ADDR", ":8080"),
-		Handler: web.New(st, worker, log),
+		Handler: web.New(st, worker, sum, log),
 		// A recording can be a few hundred megabytes, so the read timeout is
 		// generous. The size itself is capped by the handler.
 		ReadHeaderTimeout: 15 * time.Second,

@@ -1,0 +1,10 @@
+{{define "model_picker"}}{{if .Err}}
+<p class="muted small">{{.Err}}</p>
+{{else}}
+<label class="model-field">Summary model
+  <select name="summary_model">
+    {{range .Models}}<option value="{{.ID}}"{{if eq .ID $.DefaultModel}} selected{{end}}>{{.Name}} · {{.Context}} ctx</option>{{end}}
+  </select>
+</label>
+<p class="muted small">The free models on OpenCode Zen. They change, so this list is fetched fresh.</p>
+{{end}}{{end}}

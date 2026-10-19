@@ -107,6 +107,22 @@ button:hover, .btn:hover { border-color: var(--accent); color: var(--accent); }
 .htmx-indicator { opacity: 0; transition: opacity 0.2s; }
 .htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; }
 
+/* summary model picker ---------------------------------------------------- */
+.model-picker { flex-basis: 100%; }
+.model-field { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--muted); }
+.model-field select {
+  font: inherit;
+  font-size: 14px;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 7px 10px;
+  max-width: 340px;
+}
+.model-field select:hover { border-color: var(--accent); }
+.model-picker .small { margin: 6px 0 0; }
+
 /* job list ---------------------------------------------------------------- */
 .job { border-top: 1px solid var(--line); padding: 14px 0; }
 .job:first-child { border-top: 0; padding-top: 0; }

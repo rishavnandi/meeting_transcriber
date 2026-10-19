@@ -23,6 +23,9 @@
       </label>
       <button type="submit" class="primary">Transcribe</button>
       <span id="spinner" class="spinner htmx-indicator">Uploading…</span>
+      <div class="model-picker" hx-get="/models" hx-trigger="load" hx-target="this" hx-swap="innerHTML">
+        <span class="muted small">Loading the summary models…</span>
+      </div>
     </form>
     <p class="muted small">MP3, WAV, M4A and anything else ffmpeg can read. One hour of audio takes about 40 minutes to transcribe on this box.</p>
   </section>

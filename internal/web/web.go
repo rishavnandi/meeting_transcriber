@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"meetingtranscriber/internal/store"
+	"meetingtranscriber/internal/summarize"
 	"meetingtranscriber/internal/tasks"
 )
 
@@ -39,13 +40,14 @@ const maxUpload = 500 << 20
 type Server struct {
 	st     *store.Store
 	worker *tasks.Worker
+	sum    *summarize.Summarizer
 	log    *slog.Logger
 	tmpl   *template.Template
 }
 
 // New wires the app together and returns the root handler.
-func New(st *store.Store, worker *tasks.Worker, log *slog.Logger) http.Handler {
-	s := &Server{st: st, worker: worker, log: log,
+func New(st *store.Store, worker *tasks.Worker, sum *summarize.Summarizer, log *slog.Logger) http.Handler {
+	s := &Server{st: st, worker: worker, sum: sum, log: log,
 		tmpl: template.Must(template.New("t").Funcs(template.FuncMap{
 			"clock": func(seconds float64) string { return formatClock(seconds) },
 			"bytes": func(n int64) string { return formatBytes(n) },
@@ -70,6 +72,7 @@ func New(st *store.Store, worker *tasks.Worker, log *slog.Logger) http.Handler {
 	mux.HandleFunc("GET /jobs/{id}/transcript.txt", s.downloadTranscript)
 	mux.HandleFunc("GET /jobs/{id}/summary.md", s.downloadSummary)
 	mux.HandleFunc("DELETE /jobs/{id}", s.delete)
+	mux.HandleFunc("GET /models", s.models)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok\n"))
 	})
@@ -89,6 +92,10 @@ type view struct {
 	Title string
 	Jobs  []*store.Job
 	Job   *store.Job
+	// Models is the list of free models the summary can be written with.
+	Models []summarize.Model
+	// DefaultModel is the model used when the picker is not there.
+	DefaultModel string
 	// Summary is the generated summary, already rendered from markdown.
 	Summary template.HTML
 	// Transcript is the timestamped transcript.
@@ -125,17 +132,33 @@ func (s *Server) upload(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, http.StatusInternalServerError, err)
 		return
 	}
-	job, err := s.st.Create(id, filepathSafe(header.Filename), header.Size, file)
+	job, err := s.st.Create(id, filepathSafe(header.Filename), header.Size, file, r.FormValue("summary_model"))
 	if err != nil {
 		s.fail(w, http.StatusInternalServerError, err)
 		return
 	}
 	s.worker.Enqueue(id)
-	s.log.Info("uploaded", "id", id, "name", job.Name, "bytes", job.SizeBytes)
+	s.log.Info("uploaded", "id", id, "name", job.Name, "bytes", job.SizeBytes, "summary_model", job.SummaryModel)
 
 	// The card comes back as a fragment and htmx puts it at the top of the
 	// list, so the recording appears without a page reload.
 	s.render(w, http.StatusCreated, "job_card", view{Job: job})
+}
+
+// models is the picker for the model that writes the summary.
+//
+// It is a fragment that htmx loads into the upload form, so the list of free
+// models is fetched when the page opens and not baked into the binary. The
+// free models come and go, so the list has to be live.
+func (s *Server) models(w http.ResponseWriter, r *http.Request) {
+	models, err := s.sum.FreeModels(r.Context())
+	if err != nil {
+		s.log.Error("free models", "err", err)
+		// The form still works without a picker: the default model is used.
+		s.render(w, http.StatusOK, "model_picker", view{Err: "the list of free models could not be loaded"})
+		return
+	}
+	s.render(w, http.StatusOK, "model_picker", view{Models: models, DefaultModel: s.sum.DefaultModel()})
 }
 
 // card is the fragment for one job. The browser polls this while the job is
