@@ -85,6 +85,24 @@ make down     # stop it, keep the recordings
 make reset    # stop it and delete the recordings
 ```
 
+## Deploying on a server
+
+The app is deployed on `loki`, an Oracle ARM box in London with four cores and
+24 GB of memory. It lives in `/opt/meeting_transcriber`:
+
+```sh
+cd /opt/meeting_transcriber
+git pull
+docker compose up -d --build
+```
+
+Docker is set to start on boot and the container has a `restart: unless-stopped`
+policy, so the app comes back by itself after a reboot.
+
+The recording that is being transcribed holds roughly a gigabyte of memory
+while the recogniser is running, and the summary step uses whatever the model
+needs. The box has room to spare.
+
 ## Configuration
 
 Every setting is an environment variable, set in `docker-compose.yml`.
