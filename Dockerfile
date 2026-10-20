@@ -9,6 +9,40 @@ COPY internal/ ./internal/
 # CGO off gives a static binary that runs on any glibc or musl system.
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/meeting_transcriber .
 
+# ---- build the recogniser -------------------------------------------------
+# NVIDIA NeMo-Speech.cpp is the recogniser. The published binaries are built
+# for a generic baseline, so on ARM they carry none of the dotprod
+# instructions this CPU has, and the int8 matmuls that dominate recognition
+# run at a fraction of their speed. Building it here for the target CPU is
+# worth about 1.6x on an ARM box, and changes nothing in the output.
+FROM ubuntu:24.04 AS nemo
+ARG NEMO_VERSION=0.2.0
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ca-certificates cmake g++ git libsentencepiece-dev ninja-build \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /src
+RUN git clone --depth 1 --branch "v${NEMO_VERSION}" \
+      https://github.com/NVIDIA/NeMo-Speech.cpp.git . \
+    && git submodule update --init llama.cpp
+# The build host may not be the machine that runs the image, so the target
+# instruction set is pinned rather than taken from the builder. armv8.2-a
+# with dotprod covers every ARM server CPU since Ampere, and the x86 flags
+# match the baseline the published binaries use.
+RUN set -eux; \
+    if [ "$(uname -m)" = "aarch64" ]; then \
+      scripts/configure.sh cpu-asr \
+        -DGGML_NATIVE=OFF \
+        -DGGML_CPU_ARM_ARCH=armv8.2-a+dotprod; \
+    else \
+      scripts/configure.sh cpu-asr \
+        -DGGML_NATIVE=OFF \
+        -DGGML_AVX=ON -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON; \
+    fi; \
+    cmake --build --preset cpu-asr -j"$(nproc)"; \
+    cmake --install "build/cpu-asr" --prefix /opt/nemo-speech; \
+    /opt/nemo-speech/bin/nemo-speech --version
+
 # ---- runtime --------------------------------------------------------------
 FROM ubuntu:24.04
 
@@ -23,27 +57,24 @@ ENV PATH=/opt/nemo-speech/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:
 
 # ffmpeg decodes the uploads. The two binaries below are the recogniser and
 # the summariser. nemo-speech ships its own shared libraries, so nothing else
-# is needed from the system.
+# is needed from the system, except the sentencepiece runtime the locally
+# built recogniser links against.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates curl ffmpeg libgomp1 libstdc++6 passwd \
+      ca-certificates curl ffmpeg libgomp1 libsentencepiece0 libstdc++6 passwd \
     && rm -rf /var/lib/apt/lists/*
 
-# NVIDIA NeMo-Speech.cpp runs the Nemotron ASR models, and OpenCode runs the
-# free model that writes the summary. Both ship prebuilt binaries per
-# architecture, so nothing has to be compiled here.
+# The recogniser comes from the build stage above, so it carries the
+# instructions this CPU can actually run.
+COPY --from=nemo /opt/nemo-speech /opt/nemo-speech
+
+# OpenCode runs the free model that writes the summary. It ships a prebuilt
+# binary per architecture, so nothing has to be compiled here.
 RUN set -eux; \
     case "$TARGETARCH" in \
-      arm64) nemo_arch=aarch64; oc_arch=arm64 ;; \
-      amd64) nemo_arch=x86_64; oc_arch=x64 ;; \
+      arm64) oc_arch=arm64 ;; \
+      amd64) oc_arch=x64 ;; \
       *) echo "unsupported architecture: $TARGETARCH" >&2; exit 1 ;; \
     esac; \
-    curl -fsSL -o /tmp/nemo.tar.gz \
-      "https://github.com/NVIDIA/NeMo-Speech.cpp/releases/download/v${NEMO_VERSION}/nemo-speech-${NEMO_VERSION}-linux-${nemo_arch}-cpu.tar.gz"; \
-    mkdir -p /opt/nemo-speech; \
-    tar xzf /tmp/nemo.tar.gz -C /tmp; \
-    mv "/tmp/nemo-speech-${NEMO_VERSION}-linux-${nemo_arch}-cpu/"* /opt/nemo-speech/; \
-    rmdir "/tmp/nemo-speech-${NEMO_VERSION}-linux-${nemo_arch}-cpu"; \
-    rm -f /tmp/nemo.tar.gz; \
     curl -fsSL -o /tmp/oc.tar.gz \
       "https://github.com/anomalyco/opencode/releases/download/v${OPENCODE_VERSION}/opencode-linux-${oc_arch}.tar.gz"; \
     tar xzf /tmp/oc.tar.gz -C /tmp opencode; \
