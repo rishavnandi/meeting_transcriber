@@ -66,8 +66,10 @@ nearly three times as many on real meetings. It also drops names: on the
 sample meeting it lost the two people an action item was assigned to. In
 exchange it is thirty times faster and uses 74 MB rather than a gigabyte.
 
-The language check runs Nemotron on three 40 s windows before transcription,
-which costs about two minutes and is now the slowest step of an English job.
+The whole upload took 114 s with Whistle where the same file took 421 s
+before: 52 s of language check, 16 s of transcription, and the rest the
+summary. The language check runs Nemotron on three 40 s windows and is now
+the slowest step of an English job.
 
 ## Running it
 
