@@ -19,7 +19,7 @@ Go + htmx  ────  saves the recording, queues the job
 ffmpeg    ────  decodes the upload to 16 kHz mono WAV
       │
       ▼
-nemo-speech ───  samples three windows to work out the language
+language chosen on the form
       │
       ├──── English ──── needle (Whistle)   seconds
       │
@@ -33,26 +33,29 @@ Four programs do the work, and Go drives them:
 
 | Program | Job |
 |---|---|
-| `ffmpeg` | decodes the upload and cuts the sample windows |
-| `nemo-speech` | detects the language, and recognises Hindi and Hinglish |
+| `ffmpeg` | decodes the upload |
+| `nemo-speech` | recognises Hindi and Hinglish |
 | `needle` | recognises English with Cactus Whistle |
 | `opencode` | writes the summary with a free model, `opencode/big-pickle` |
 
 ## The two speech engines
 
-The app picks the recogniser per recording, based on what the audio actually
-contains. It samples three short windows near the start, the middle and the
-end, and looks for Devanagari in the result.
+The upload form has a language selector: **English** or **Hindi / Hinglish**.
+It picks the recogniser, because the two engines cannot hear the same thing.
 
 | Recording | Engine | Why |
 |---|---|---|
 | English only | `whistle` | about fifty times faster than real time |
 | Any Hindi | `nemotron-3.5` | handles English and Hindi in the same file |
 
-Whistle is 16.9 MB and English only. Nemotron is over a gigabyte and
-multilingual. Whisper would force one language on the whole file, so on a
-Hinglish recording it drops half of it. Nemotron detects the language per
-utterance and keeps both.
+The choice is manual on purpose. Whistle has no Hindi at all and returns
+confident nonsense when it hears some, so a wrong guess would look like a
+transcript rather than an error. Its decoder confidence does not separate the
+two languages cleanly enough to automate the call.
+
+Whistle is 16.9 MB; Nemotron is over a gigabyte. Whisper would force one
+language on the whole file, so on a Hinglish recording it drops half of it.
+Nemotron detects the language per utterance and keeps both.
 
 Measured on the target box (4 ARM cores, no GPU):
 
@@ -66,10 +69,8 @@ nearly three times as many on real meetings. It also drops names: on the
 sample meeting it lost the two people an action item was assigned to. In
 exchange it is thirty times faster and uses 74 MB rather than a gigabyte.
 
-The whole upload took 114 s with Whistle where the same file took 421 s
-before: 52 s of language check, 16 s of transcription, and the rest the
-summary. The language check runs Nemotron on three 40 s windows and is now
-the slowest step of an English job.
+The same upload took 60 s end to end with Whistle where it took 421 s before:
+16 s of transcription and the rest the summary.
 
 ## Running it
 
@@ -180,7 +181,7 @@ It is skipped unless `SUMMARIZE_TEST` is set, because it needs a model.
 ```
 main.go                 wiring and configuration
 internal/store          jobs on disk, one directory each, no database
-internal/asr            ffmpeg, the recogniser, language detection
+internal/asr            ffmpeg, the two recognisers
 internal/summarize      opencode run and reading its answer
 internal/tasks          the job queue and the pipeline
 internal/web            the htmx handlers, templates and styles

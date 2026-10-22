@@ -1,5 +1,5 @@
-// Package tasks runs the job pipeline: decode, detect the language, pick a
-// model, transcribe, summarise.
+// Package tasks runs the job pipeline: decode, transcribe with the engine for
+// the language that was chosen, summarise.
 //
 // One job is processed at a time. The recogniser uses every core of the box,
 // so running two at once would not make either of them faster, and the box has
@@ -116,22 +116,10 @@ func (w *Worker) run(ctx context.Context, job *store.Job) error {
 	}
 	job.Duration = duration
 
-	// Step 2: work out whether the recording is English or Hindi, and pick the
-	// model that suits it.
-	w.stage(job, store.StatusDetecting, "checking which language the recording is in")
-	devanagari, languages, err := w.asr.DetectLanguages(ctx, wav, duration)
-	if err != nil {
-		// Not fatal. The multilingual model handles both languages, so it is
-		// the safe answer when the sample could not be read.
-		w.log.Warn("language detection failed, using the multilingual model", "id", job.ID, "err", err)
-		devanagari = true
-	}
-	job.Languages = languages
-
-	// Step 3: transcribe the whole recording with the engine that suits it.
+	// Step 2: transcribe with the engine for the language that was chosen.
 	multilingual, english := w.asr.Models()
 	var res *asr.Result
-	if devanagari {
+	if job.Language == "hi" {
 		job.Model = multilingual
 		w.stage(job, store.StatusTranscribing, "transcribing with "+multilingual)
 		res, err = w.asr.Transcribe(ctx, wav, multilingual)
@@ -147,7 +135,7 @@ func (w *Worker) run(ctx context.Context, job *store.Job) error {
 		return err
 	}
 
-	// Step 4: summarise. A summary that fails does not fail the job: the
+	// Step 3: summarise. A summary that fails does not fail the job: the
 	// transcript is the reason the recording was uploaded.
 	w.stage(job, store.StatusSummarizing, "writing the summary")
 	summary, err := w.sum.Summarize(ctx, w.st.TranscriptTextPath(job.ID), job.SummaryModel)

@@ -59,12 +59,16 @@ type Job struct {
 	Model     string `json:"model"`
 	// SummaryModel is the model that writes the summary, chosen when the
 	// recording was uploaded.
-	SummaryModel string    `json:"summary_model,omitempty"`
-	Languages    []string  `json:"languages"`
-	Duration     float64   `json:"duration_seconds"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
-	Summary      string    `json:"summary,omitempty"`
+	SummaryModel string `json:"summary_model,omitempty"`
+	// Language is the language of the recording, chosen on the upload form:
+	// "en" for English, "hi" for Hindi or Hinglish. It decides which
+	// recogniser runs.
+	Language  string    `json:"language"`
+	Languages []string  `json:"languages"`
+	Duration  float64   `json:"duration_seconds"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Summary   string    `json:"summary,omitempty"`
 	// SummaryError is set when the transcript worked but the summary did not.
 	// The job still succeeds, because the transcript is the point.
 	SummaryError string `json:"summary_error,omitempty"`
@@ -116,7 +120,7 @@ func (s *Store) WorkPath(id string) string {
 
 // Create writes a new job and its source file. The recording is copied rather
 // than moved so the upload can be streamed straight to disk.
-func (s *Store) Create(id, name string, size int64, src io.Reader, summaryModel string) (*Job, error) {
+func (s *Store) Create(id, name string, size int64, src io.Reader, summaryModel, language string) (*Job, error) {
 	dir := s.jobDir(id)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf("create job dir: %w", err)
@@ -134,7 +138,7 @@ func (s *Store) Create(id, name string, size int64, src io.Reader, summaryModel 
 	}
 	now := time.Now().UTC()
 	job := &Job{
-		ID: id, Name: name, SizeBytes: size, SummaryModel: summaryModel,
+		ID: id, Name: name, SizeBytes: size, SummaryModel: summaryModel, Language: language,
 		Status: StatusQueued, Stage: "waiting for a free worker",
 		CreatedAt: now, UpdatedAt: now,
 	}

@@ -23,11 +23,17 @@
       </label>
       <button type="submit" class="primary">Transcribe</button>
       <span id="spinner" class="spinner htmx-indicator">Uploading…</span>
+      <label class="model-field">Language
+        <select name="language">
+          <option value="en" selected>English</option>
+          <option value="hi">Hindi / Hinglish</option>
+        </select>
+      </label>
       <div class="model-picker" hx-get="/models" hx-trigger="load" hx-target="this" hx-swap="innerHTML">
         <span class="muted small">Loading the summary models…</span>
       </div>
     </form>
-    <p class="muted small">MP3, WAV, M4A and anything else ffmpeg can read. An English meeting transcribes in seconds and is summarised a minute later; a meeting with Hindi in it takes about 40 minutes per hour of audio.</p>
+    <p class="muted small">MP3, WAV, M4A and anything else ffmpeg can read. English is transcribed by Whistle in seconds; Hindi and Hinglish go to Nemotron at about 40 minutes per hour of audio. Pick the language the meeting is actually in.</p>
   </section>
 
   <section class="panel">

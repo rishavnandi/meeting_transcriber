@@ -132,13 +132,19 @@ func (s *Server) upload(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, http.StatusInternalServerError, err)
 		return
 	}
-	job, err := s.st.Create(id, filepathSafe(header.Filename), header.Size, file, r.FormValue("summary_model"))
+	// Anything but Hindi is English. The form only offers those two.
+	language := r.FormValue("language")
+	if language != "hi" {
+		language = "en"
+	}
+	job, err := s.st.Create(id, filepathSafe(header.Filename), header.Size, file, r.FormValue("summary_model"), language)
 	if err != nil {
 		s.fail(w, http.StatusInternalServerError, err)
 		return
 	}
 	s.worker.Enqueue(id)
-	s.log.Info("uploaded", "id", id, "name", job.Name, "bytes", job.SizeBytes, "summary_model", job.SummaryModel)
+	s.log.Info("uploaded", "id", id, "name", job.Name, "bytes", job.SizeBytes,
+		"language", job.Language, "summary_model", job.SummaryModel)
 
 	// The card comes back as a fragment and htmx puts it at the top of the
 	// list, so the recording appears without a page reload.

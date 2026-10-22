@@ -4,13 +4,15 @@
 // 16 kHz mono PCM WAV both recognisers want, needle recognises English with
 // Cactus Whistle, and nemo-speech recognises Hindi with NVIDIA Nemotron 3.5.
 //
-// Two engines are used, chosen per recording:
+// The language is chosen on the upload form, because the engines disagree on
+// what they can hear:
 //
 //	whistle       English only, 16.9 MB, about fifty times faster than real time
 //	nemotron-3.5  multilingual, handles English and Hindi in the same file
 //
-// The choice is made by looking for Devanagari in a short sample of the audio
-// before the full transcription starts. See DetectLanguages.
+// Whistle has no Hindi at all, so a recording with any Hindi in it has to go
+// to Nemotron. That is why the choice is not detected: a wrong guess would
+// produce a confident transcript of the wrong language.
 package asr
 
 import (
@@ -18,9 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -142,8 +142,8 @@ type whistleResult struct {
 // TranscribeEnglish runs Whistle over a WAV file and returns its output.
 //
 // Whistle is English only, and much faster than Nemotron, so it gets every
-// recording the language detector found no Hindi in. The language is forced
-// because that call has already been made.
+// recording the uploader marked as English. The language is forced because
+// that call has already been made.
 func (a *ASR) TranscribeEnglish(ctx context.Context, wavPath string) (*Result, error) {
 	cmd := exec.CommandContext(ctx, a.cfg.Whistle,
 		"--model", a.cfg.WhistleModel,
@@ -171,113 +171,4 @@ func (a *ASR) TranscribeEnglish(ctx context.Context, wavPath string) (*Result, e
 		res.Words = append(res.Words, Word{Word: w.Word, Start: w.Start, End: w.End})
 	}
 	return res, nil
-}
-
-// window is a slice of audio to sample.
-type window struct {
-	offset float64
-	length float64
-}
-
-// sampleWindows picks the parts of a recording used to work out which language
-// it is in.
-//
-// The windows are short and spread over the file, because a recording can open
-// in English and switch to Hindi halfway through. The extra work is a small
-// fraction of a full transcription.
-func sampleWindows(duration float64) []window {
-	const length = 40
-	if duration <= 0 {
-		return nil
-	}
-	if duration <= length {
-		return []window{{0, duration}}
-	}
-	span := duration - length
-	switch {
-	case duration <= 2*length:
-		return []window{{0, length}, {span, length}}
-	case duration <= 3*length:
-		return []window{{0, length}, {span / 2, length}, {span, length}}
-	default:
-		return []window{{span * 0.05, length}, {span * 0.45, length}, {span * 0.85, length}}
-	}
-}
-
-// DetectLanguages samples the recording and reports whether it contains Hindi.
-//
-// The answer is a boolean rather than a language list on purpose. The question
-// that matters is "is there Devanagari in this", because that is what decides
-// between the multilingual model and the English-only one. The language names
-// the recogniser reports are kept as well, for display.
-//
-// If not one window could be read the call fails, so the caller can fall back
-// to the multilingual model rather than guessing that the audio is English.
-func (a *ASR) DetectLanguages(ctx context.Context, wavPath string, duration float64) (devanagari bool, languages []string, err error) {
-	windows := sampleWindows(duration)
-	if len(windows) == 0 {
-		return false, nil, fmt.Errorf("cannot sample a file of %v seconds", duration)
-	}
-	dir, err := os.MkdirTemp("", "sample-")
-	if err != nil {
-		return false, nil, fmt.Errorf("temp dir: %w", err)
-	}
-	defer os.RemoveAll(dir)
-
-	seen := map[string]bool{}
-	read := 0
-	for i, w := range windows {
-		clip := filepath.Join(dir, fmt.Sprintf("clip%d.wav", i))
-		if err := a.clip(ctx, wavPath, clip, w); err != nil {
-			a.log.Warn("language sample failed", "window", i, "err", err)
-			continue
-		}
-		res, err := a.Transcribe(ctx, clip, a.cfg.ModelMultilingual)
-		if err != nil {
-			a.log.Warn("language sample failed", "window", i, "err", err)
-			continue
-		}
-		read++
-		if HasDevanagari(res.Text) {
-			devanagari = true
-		}
-		for _, l := range res.Languages {
-			if !seen[l] {
-				seen[l] = true
-				languages = append(languages, l)
-			}
-		}
-	}
-	if read == 0 {
-		return false, nil, fmt.Errorf("none of the %d sample windows could be read", len(windows))
-	}
-	return devanagari, languages, nil
-}
-
-// clip cuts one window out of a WAV file.
-func (a *ASR) clip(ctx context.Context, src, dst string, w window) error {
-	cmd := exec.CommandContext(ctx, a.cfg.FFmpeg,
-		"-y", "-loglevel", "error",
-		"-ss", strconv.FormatFloat(w.offset, 'f', 3, 64),
-		"-i", src, "-t", strconv.FormatFloat(w.length, 'f', 3, 64),
-		"-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le",
-		dst)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("ffmpeg clip: %w: %s", err, strings.TrimSpace(string(out)))
-	}
-	return nil
-}
-
-// HasDevanagari reports whether text contains a Devanagari character.
-//
-// Devanagari is the script Hindi is written in, so its presence is what
-// separates a Hindi or Hinglish recording from an English one. The range is
-// U+0900 to U+097F.
-func HasDevanagari(text string) bool {
-	for _, r := range text {
-		if r >= 0x0900 && r <= 0x097F {
-			return true
-		}
-	}
-	return false
 }
