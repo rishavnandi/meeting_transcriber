@@ -1,15 +1,16 @@
 // Command meeting_transcriber serves a small web app that turns uploaded
 // meeting recordings into transcripts and summaries.
 //
-// The heavy lifting is done by two programs on the machine rather than by Go:
+// The heavy lifting is done by four programs on the machine rather than by Go:
 //
 //	ffmpeg      decodes the upload into 16 kHz mono WAV
-//	nemo-speech recognises it with Nemotron 3.5 ASR or Nemotron English ASR
+//	needle      recognises English with Cactus Whistle
+//	nemo-speech recognises Hindi with Nemotron 3.5
 //	opencode    writes the summary with a free model
 //
-// The model used for recognition is chosen per recording: a recording with
-// Hindi in it gets the multilingual model, a pure English one gets the English
-// model, which is measurably better on English.
+// The recogniser is chosen per recording: a recording with Hindi in it gets the
+// multilingual model, a pure English one gets Whistle, which is roughly fifty
+// times faster and gives up some accuracy for it.
 package main
 
 import (
@@ -55,10 +56,12 @@ func run(log *slog.Logger) error {
 
 	asrEngine := asr.New(asr.Config{
 		Binary:            env("NEMO_BIN", "nemo-speech"),
+		Whistle:           env("WHISTLE_BIN", "needle"),
+		WhistleModel:      env("WHISTLE_MODEL", "/opt/whistle/whistle.cact"),
 		FFmpeg:            env("FFMPEG_BIN", "ffmpeg"),
 		FFprobe:           env("FFPROBE_BIN", "ffprobe"),
 		ModelMultilingual: env("MODEL_MULTILINGUAL", "nemotron-3.5"),
-		ModelEnglish:      env("MODEL_ENGLISH", "nemotron-en"),
+		ModelEnglish:      env("MODEL_ENGLISH", "whistle"),
 	}, log)
 
 	sum := summarize.New(summarize.Config{

@@ -83,33 +83,3 @@ func TestTranscriptTextFallsBackToPlainText(t *testing.T) {
 		t.Errorf("TranscriptText() = %q, want the plain text", got)
 	}
 }
-
-func TestTranscriptTextNamesSpeakers(t *testing.T) {
-	res := &Result{
-		Words: []Word{
-			{Word: "hello", Start: 0, End: 0.4, Speaker: 1},
-			{Word: "there", Start: 0.5, End: 0.9, Speaker: 1},
-			// A change of speaker starts a new line, even without a pause.
-			{Word: "hi", Start: 1.0, End: 1.3, Speaker: 2},
-			{Word: "you", Start: 1.4, End: 1.8, Speaker: 2},
-		},
-	}
-	want := "[00:00] Speaker 1: hello there\n[00:01] Speaker 2: hi you\n"
-	if got := res.TranscriptText(); got != want {
-		t.Errorf("TranscriptText()\n got %q\nwant %q", got, want)
-	}
-}
-
-func TestTranscriptTextWithoutSpeakers(t *testing.T) {
-	// A recording that was not diarised must not get a speaker label.
-	res := &Result{
-		Words: []Word{
-			{Word: "hello", Start: 0, End: 0.4},
-			{Word: "there", Start: 0.5, End: 0.9},
-		},
-	}
-	want := "[00:00] hello there\n"
-	if got := res.TranscriptText(); got != want {
-		t.Errorf("TranscriptText()\n got %q\nwant %q", got, want)
-	}
-}

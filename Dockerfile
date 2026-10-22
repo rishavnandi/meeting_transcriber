@@ -50,10 +50,13 @@ FROM ubuntu:24.04
 ARG TARGETARCH
 ARG NEMO_VERSION=0.2.0
 ARG OPENCODE_VERSION=1.19.3
+# Pinned so a rebuild transcribes the same audio with the same weights.
+ARG NEEDLE_REV=d6c7d6a2e9655505e0f8e23339356dd1705900eb
+ARG WHISTLE_REV=741118687e1f008f06d1351a402a731274789790
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV HOME=/home/app
-ENV PATH=/opt/nemo-speech/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ENV PATH=/opt/nemo-speech/bin:/opt/whistle:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # ffmpeg decodes the uploads. The two binaries below are the recogniser and
 # the summariser. nemo-speech ships its own shared libraries, so nothing else
@@ -66,6 +69,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # The recogniser comes from the build stage above, so it carries the
 # instructions this CPU can actually run.
 COPY --from=nemo /opt/nemo-speech /opt/nemo-speech
+
+# Whistle is the English recogniser: a 1.4 MB engine and 16.9 MB of weights, so
+# it is baked in rather than pulled into the cache volume at first start.
+RUN set -eux; \
+    case "$TARGETARCH" in \
+      arm64) whistle_arch=linux-arm64 ;; \
+      amd64) whistle_arch=linux-x86_64 ;; \
+      *) echo "unsupported architecture: $TARGETARCH" >&2; exit 1 ;; \
+    esac; \
+    mkdir -p /opt/whistle; \
+    curl -fsSL -o /opt/whistle/needle \
+      "https://huggingface.co/Cactus-Compute/needle3/resolve/${NEEDLE_REV}/${whistle_arch}/needle"; \
+    curl -fsSL -o /opt/whistle/whistle.cact \
+      "https://huggingface.co/Cactus-Compute/whistle/resolve/${WHISTLE_REV}/whistle.cact"; \
+    chmod +x /opt/whistle/needle; \
+    ls -l /opt/whistle
 
 # OpenCode runs the free model that writes the summary. It ships a prebuilt
 # binary per architecture, so nothing has to be compiled here.

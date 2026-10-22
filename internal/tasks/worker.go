@@ -127,16 +127,19 @@ func (w *Worker) run(ctx context.Context, job *store.Job) error {
 		devanagari = true
 	}
 	job.Languages = languages
-	multilingual, english := w.asr.Models()
-	model := multilingual
-	if !devanagari {
-		model = english
-	}
-	job.Model = model
-	w.stage(job, store.StatusTranscribing, "transcribing with "+model)
 
-	// Step 3: transcribe the whole recording.
-	res, err := w.asr.Transcribe(ctx, wav, model, job.Diarize)
+	// Step 3: transcribe the whole recording with the engine that suits it.
+	multilingual, english := w.asr.Models()
+	var res *asr.Result
+	if devanagari {
+		job.Model = multilingual
+		w.stage(job, store.StatusTranscribing, "transcribing with "+multilingual)
+		res, err = w.asr.Transcribe(ctx, wav, multilingual)
+	} else {
+		job.Model = english
+		w.stage(job, store.StatusTranscribing, "transcribing with "+english)
+		res, err = w.asr.TranscribeEnglish(ctx, wav)
+	}
 	if err != nil {
 		return err
 	}

@@ -19,45 +19,55 @@ Go + htmx  ────  saves the recording, queues the job
 ffmpeg    ────  decodes the upload to 16 kHz mono WAV
       │
       ▼
-nemo-speech ───  samples three windows to work out the language,
-      │            then transcribes the whole file
+nemo-speech ───  samples three windows to work out the language
+      │
+      ├──── English ──── needle (Whistle)   seconds
+      │
+      └──── Hindi ────── nemo-speech (Nemotron 3.5)
+      │
       ▼
 opencode  ────  writes the summary from the transcript
 ```
 
-Three programs do the work, and Go drives them:
+Four programs do the work, and Go drives them:
 
 | Program | Job |
 |---|---|
 | `ffmpeg` | decodes the upload and cuts the sample windows |
-| `nemo-speech` | recognises the audio with NVIDIA's Nemotron ASR models |
+| `nemo-speech` | detects the language, and recognises Hindi and Hinglish |
+| `needle` | recognises English with Cactus Whistle |
 | `opencode` | writes the summary with a free model, `opencode/big-pickle` |
 
-## The two speech models
+## The two speech engines
 
 The app picks the recogniser per recording, based on what the audio actually
 contains. It samples three short windows near the start, the middle and the
 end, and looks for Devanagari in the result.
 
-| Recording | Model | Why |
+| Recording | Engine | Why |
 |---|---|---|
-| English only | `nemotron-en` | measurably better on English |
+| English only | `whistle` | about fifty times faster than real time |
 | Any Hindi | `nemotron-3.5` | handles English and Hindi in the same file |
 
-This matters more than it sounds. Whisper forces one language on the whole
-file, so on a Hinglish recording it drops half of it. Nemotron detects the
-language per utterance and keeps both.
+Whistle is 16.9 MB and English only. Nemotron is over a gigabyte and
+multilingual. Whisper would force one language on the whole file, so on a
+Hinglish recording it drops half of it. Nemotron detects the language per
+utterance and keeps both.
 
-Measured on the target box (4 ARM cores, no GPU), same eleven minutes of
-audio for both:
+Measured on the target box (4 ARM cores, no GPU):
 
-| Engine | Time | Per hour of audio | Hindi | English | Mixed EN+HI file |
-|---|---|---|---|---|---|
-| Nemotron 3.5 | 7 m 04 s | ~38 min | 1–3 errors per clip | 1–4 errors per clip | both languages kept |
-| Whisper large-v3-turbo | 22 m 06 s | ~2 h | 8–10 errors, truncates | 0–1 errors per clip | English half dropped, Hindi garbled |
+| Engine | 13 min English meeting | Per hour of audio | FLEURS English | AMI meetings |
+|---|---|---|---|---|
+| Whistle | 15 s | ~70 s | 12.6% WER | 25.0% WER |
+| Nemotron 3.5 / English | 8 m 11 s | ~38 min | 6.8% WER | 9.3% WER |
 
-Error counts are against the FLEURS ground truth, over eight Hindi clips and
-four English clips.
+Whistle makes about twice as many word errors as Nemotron on clean English and
+nearly three times as many on real meetings. It also drops names: on the
+sample meeting it lost the two people an action item was assigned to. In
+exchange it is thirty times faster and uses 74 MB rather than a gigabyte.
+
+The language check runs Nemotron on three 40 s windows before transcription,
+which costs about two minutes and is now the slowest step of an English job.
 
 ## Running it
 
@@ -99,9 +109,10 @@ docker compose up -d --build
 Docker is set to start on boot and the container has a `restart: unless-stopped`
 policy, so the app comes back by itself after a reboot.
 
-The recording that is being transcribed holds roughly a gigabyte of memory
-while the recogniser is running, and the summary step uses whatever the model
-needs. The box has room to spare.
+The recording that is being transcribed holds under 200 MB of memory for an
+English job, and roughly a gigabyte when Nemotron runs on a recording with
+Hindi in it. The summary step uses whatever the model needs. The box has room
+to spare.
 
 ## Configuration
 
@@ -112,32 +123,15 @@ Every setting is an environment variable, set in `docker-compose.yml`.
 | `ADDR` | `:8080` | address to listen on |
 | `DATA_DIR` | `/data` | where recordings and transcripts are kept |
 | `MODEL_MULTILINGUAL` | `nemotron-3.5` | model for recordings containing Hindi |
-| `MODEL_ENGLISH` | `nemotron-en` | model for English only recordings |
+| `MODEL_ENGLISH` | `whistle` | name shown for the English engine |
 | `SUMMARY_MODEL` | `opencode/big-pickle` | model used when the picker is not there |
 | `SUMMARY_TIMEOUT` | `15m` | how long the whole summary may take |
 | `NEMO_BIN` | `nemo-speech` | path to the recogniser |
+| `WHISTLE_BIN` | `needle` | path to the English recogniser |
+| `WHISTLE_MODEL` | `/opt/whistle/whistle.cact` | path to its weights |
 | `FFMPEG_BIN` | `ffmpeg` | path to ffmpeg |
 | `FFPROBE_BIN` | `ffprobe` | path to ffprobe |
 | `OPENCODE_BIN` | `opencode` | path to opencode |
-
-## Speaker labels
-
-The upload form has a **Speaker labels** checkbox, on by default. With it on,
-the recogniser also works out who spoke when from the voice alone, and the
-transcript reads as a conversation:
-
-```
-[00:00] Speaker 1: Priya here the refund webhook is still failing for partial refunds. I looked at the logs this morning
-[00:06] Speaker 1: is returning a five hundred.
-[00:08] Speaker 2: Thanks Priya Rahul here. I will get the production keys from the payment team before Friday
-```
-
-The diariser is NVIDIA's Sortformer, which sorts out up to four speakers. It
-does not know anyone's name, only that two voices are different, so the label
-is a number. People usually name themselves in a meeting, and the summariser
-picks the names up from what they say.
-
-It costs one more model (147 MB) and one more pass over the audio.
 
 ## The summary
 
@@ -207,8 +201,8 @@ make check    # go vet and go test
 make run      # run it on this machine, without containers
 ```
 
-The recogniser and ffmpeg have to be on your `PATH` for `make run` to work.
-On a Mac:
+The recognisers, `needle` and `nemo-speech`, and ffmpeg have to be on your
+`PATH` for `make run` to work. On a Mac:
 
 ```sh
 brew install ffmpeg
