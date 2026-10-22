@@ -69,7 +69,7 @@ nearly three times as many on real meetings. It also drops names: on the
 sample meeting it lost the two people an action item was assigned to. In
 exchange it is thirty times faster and uses 74 MB rather than a gigabyte.
 
-The same upload took 60 s end to end with Whistle where it took 421 s before:
+The same upload took 66 s end to end with Whistle where it took 421 s before:
 16 s of transcription and the rest the summary.
 
 ## Running it
